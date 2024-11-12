@@ -1,0 +1,6 @@
+[submodule "PGM-index"]
+	path = PGM-index
+	url = https://github.com/gvinciguerra/PGM-index
+[submodule "DynamicLearnedIndex"]
+	path = DynamicLearnedIndex
+	url = https://github.com/Sgelet/DynamicLearnedIndex
