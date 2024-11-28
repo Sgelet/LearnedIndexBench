@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 trans = {
-    "PGM" : ["PGM", "blue", '-'],
-    "IDX" : ["IDX", "orange", ':'],
-    "OPT" : ["IDX", "orange", '-'],
+    "PGM" : ["Logar.", "blue", '-'],
+    "IDX" : ["Dynamic", "orange", ':'],
+    "OPT" : ["Dynamic", "orange", '-'],
     "NOSTORE" : ["NOSTORE", "", '']
 }
 def parse_linecount(file):
     res = {
         "name": file.name,
-        "model": file.name.split('_')[-2][1:],
+        "model": file.name.split('_')[-2],
         "elem": [],
         "val": [],
         "size" : 0
@@ -37,8 +37,8 @@ def parse_linecount(file):
 # Parsing is stupid, added manually
 ratios = ("0.0", "0.25", "0.5", "0.75", "1.0", "ADV")
 run_data = {
-    'IDX' : [],
-    'PGM' : []
+    'Dynamic' : [],
+    'Logar.' : []
 }
 
 def parse_run(file):

@@ -1,7 +1,11 @@
 #!/bin/bash
 
 declare -a epsilons=(
+  "16"
+  "32"
   "64"
+  "128"
+  "256"
 )
 
 declare -a ratios=(
@@ -12,7 +16,7 @@ declare -a ratios=(
   "1.0"
 )
 
-mapfile -t files <<< "$(ls -1 data/sec*.data)"
+mapfile -t files <<< "$(ls -1 data/*.data)"
 
 mkdir out
 rm -f out/*.run
@@ -31,5 +35,9 @@ do
       echo "Running IDX epsilon=$i, ratio=$r"
       cat "${files[$f]}" | ./bin/LearnedIndexBenchIDX$i RUN 10000000 $r 0.5 >> out/${filename}_idx_$i_$r.run
     done
+    echo "Running PGM epsilon=$1, adversarial"
+    cat "${files[$f]}" | ./bin/LearnedIndexBenchPGM$i ADV 10000000 >> out/${filename}_pgm_$i.run_adv
+    echo "Running IDX epsilon=$i, adversarial"
+    cat "${files[$f]}" | ./bin/LearnedIndexBenchIDX$i ADV 10000000 >> out/${filename}_idx_$i.run_adv
   done
 done

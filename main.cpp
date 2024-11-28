@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstring>
 #include <unordered_set>
-#include "DynamicLearnedIndex/learned_index/LearnedIndex.h"
+#include "../DynamicLearnedIndex/learned_index/LearnedIndex.h"
 #include "PGM-index/include/pgm/pgm_index_dynamic.hpp"
 #include "PGM-index/include/pgm/pgm_index.hpp"
 #include "iostream"
@@ -103,10 +103,12 @@ template<typename T>
 std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const uint op_count, const double q_ratio, const double ins_ratio){
     std::vector<std::pair<T,T>> queries;
     queries.reserve(op_count);
+    std::vector<T> sorted_data;
+    sorted_data.assign(data.begin(),data.begin()+(data.size()-op_count));
+    std::sort(sorted_data.begin(),sorted_data.end());
 
     std::mt19937 engine(9001);
-    std::uniform_int_distribution<T> key_dist(1,1e11);
-    std::uniform_int_distribution<T> id_dist(1,1e8-op_count);
+    std::uniform_int_distribution<T> id_dist(1,data.size()-op_count);
 
     uint num_queries = (q_ratio*op_count);
     uint inserts = (op_count - num_queries)*ins_ratio;
@@ -116,8 +118,19 @@ std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const ui
     T hi;
 
     for(uint i=0; i<num_queries; ++i){
-        lo = key_dist(engine);
-        hi = lo+1000000;//key_dist(engine);
+        lo = id_dist(engine);
+        hi = lo+sqrt(data.size())/10;
+        if(lo > sorted_data.size()){
+            lo = sorted_data.size()-1;
+        }
+        if(hi > sorted_data.size()){
+            hi = sorted_data.size() - 1;
+        }
+        lo = sorted_data[lo];
+        hi = sorted_data[hi];
+        if(lo > hi){
+            std::swap(lo,hi);
+        }
         queries.emplace_back(lo,hi);
     }
     for(uint i=0; i<inserts; ++i){
