@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstring>
 #include <unordered_set>
-#include "../DynamicLearnedIndex/learned_index/LearnedIndex.h"
+#include "DynamicLearnedIndex/learned_index/LearnedIndex.h"
 #include "PGM-index/include/pgm/pgm_index_dynamic.hpp"
 #include "PGM-index/include/pgm/pgm_index.hpp"
 #include "iostream"
@@ -21,6 +21,7 @@ std::vector<T> readData(){
     std::vector<T> res;
     res.reserve(1e9);
     T e;
+    uint i = 0;
     std::cout << "Reading data... ";
     auto t0 = hrc::now();
     while(std::cin>>e){
@@ -100,12 +101,9 @@ void lineCountTest(const std::vector<T>& data, int interval){
 }
 
 template<typename T>
-std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const uint op_count, const double q_ratio, const double ins_ratio){
+std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const uint op_count, const double q_ratio, const double ins_ratio, const T r_start=0, const T r_end=0){
     std::vector<std::pair<T,T>> queries;
     queries.reserve(op_count);
-    std::vector<T> sorted_data;
-    sorted_data.assign(data.begin(),data.begin()+(data.size()-op_count));
-    std::sort(sorted_data.begin(),sorted_data.end());
 
     std::mt19937 engine(9001);
     std::uniform_int_distribution<T> id_dist(1,data.size()-op_count);
@@ -113,6 +111,10 @@ std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const ui
     uint num_queries = (q_ratio*op_count);
     uint inserts = (op_count - num_queries)*ins_ratio;
     uint deletes = op_count - inserts - num_queries;
+
+    std::vector<T> sorted_data;
+    sorted_data.assign(data.begin(),data.begin()+(data.size()-inserts-1));
+    std::sort(sorted_data.begin(),sorted_data.end());
 
     T lo;
     T hi;
@@ -136,7 +138,12 @@ std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const ui
     for(uint i=0; i<inserts; ++i){
         queries.emplace_back(-1,data[data.size()-op_count+i]);
     }
-    for(uint i=0; i<deletes; ++i){
+    uint count = (r_end - r_start);
+    for(uint i=r_start; i<r_end && count < deletes;++i){
+        queries.emplace_back(-2,sorted_data[i]);
+        count++;
+    }
+    for(uint i=count; i<deletes; ++i){
         queries.emplace_back(-2,data[id_dist(engine)]);
     }
 
@@ -146,15 +153,20 @@ std::vector<std::pair<T,T>> generateQueries(const std::vector<T>& data, const ui
 }
 
 template<typename T, int epsilon = EPSILON>
-void runtimeTest(const std::vector<T>& data, const uint op_count = 10000000, const double q_ratio = 0.5, double ins_ratio = 0.5){
+void runtimeTest(std::vector<T>& data, uint op_count = 10000000, const double q_ratio = 0.5, double ins_ratio = 0.5, double del_ratio = 0.5, const T r_start=0, const T r_end=0){
     auto index = LearnedIndex<T,epsilon>();
     auto pgm = pgm::DynamicPGMIndex<T,T, pgm::PGMIndex<T,epsilon>>();
+    std::mt19937 engine(9001);
 
     std::cout << "Inserting...";
 
     auto t0 = hrc::now();
 
-    for(uint i=0; i< data.size() - op_count; ++i){
+    if(op_count > data.size()) op_count = data.size()*(1-del_ratio);
+
+    uint count = data.size() - ((op_count-(op_count*q_ratio))*ins_ratio);
+
+    for(uint i=0; i<count; ++i){
         if constexpr (MODEL == 0) pgm.insert_or_assign(data[i],data[i]);
         else index.insert(data[i]);
     }
@@ -163,7 +175,22 @@ void runtimeTest(const std::vector<T>& data, const uint op_count = 10000000, con
 
     std::cout << " done in: " << (t1-t0).count() * 1e-9 << std::endl;
 
-    auto queries = generateQueries<T>(data,op_count,q_ratio,ins_ratio);
+    std::shuffle(data.begin(), data.begin()+(count-1),engine);
+
+    std::cout << "Deleting...";
+
+    t0 = hrc::now();
+
+    for(uint i=0; i<count*del_ratio; ++i){
+        if constexpr (MODEL == 0) pgm.erase(data[i]);
+        else index.remove(data[i]);
+    }
+
+    t1 = hrc::now();
+
+    std::cout << " done in: " << (t1-t0).count() * 1e-9 << std::endl;
+
+    auto queries = generateQueries<T>(data,op_count,q_ratio,ins_ratio,r_start,r_end);
 
     std::cout << "Simulating dynamic batch of " << op_count << " operations, with query ratio "<< q_ratio << std::endl;
 
@@ -199,6 +226,10 @@ void adversarialTest(const std::vector<T>& data, const uint op_count = 10000000)
     for(uint i=0; i< data.size(); ++i){
         if constexpr (MODEL == 0) pgm.insert_or_assign(data[i],data[i]);
         else index.insert(data[i]);
+
+        //if(!index.runPages()){
+        //    std::cout << "Borked insert at i=" << i << std::endl;
+        //}
     }
 
     auto t1 = hrc::now();
@@ -253,7 +284,9 @@ int main(int argc, char* argv[]){
         lineCountTest<numtype>(data,std::stol(argv[2]));
     } else if(!std::strcmp(argv[1],"RUN")){
         auto data = readData<numtype>();
-        runtimeTest(data,std::stol(argv[2]),std::stod(argv[3]),std::stod(argv[4]));
+        if(argc == 8) runtimeTest(data,std::stol(argv[2]),std::stod(argv[3]),std::stod(argv[4]),std::stod(argv[5]),std::stol(argv[6]),std::stol(argv[7]));
+        else if(argc == 6) runtimeTest(data,std::stol(argv[2]),std::stod(argv[3]),std::stod(argv[4]),std::stod(argv[5]));
+        else runtimeTest(data,std::stol(argv[2]),std::stod(argv[3]),std::stod(argv[4]));
     } else if(!std::strcmp(argv[1],"ADV")){
         auto data = readData<numtype>();
         adversarialTest(data,std::stol(argv[2]));
